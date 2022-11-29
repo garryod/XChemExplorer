@@ -3204,16 +3204,13 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
             autoDir = self.processedDir
 
         self.Logfile.insert("checking for new data processing results in " + autoDir)
+        path_list = sorted(glob.glob(os.path.join(autoDir, "*")))
         progress = 0
-        progress_step = XChemMain.getProgressSteps(
-            len(glob.glob(os.path.join(autoDir, "*")))
-        )
+        progress_step = XChemMain.getProgressSteps(len(path_list))
 
         runList = []
         self.Logfile.insert("--> " + os.path.join(autoDir, "*"))
-        for nx, collected_xtals in enumerate(
-            sorted(glob.glob(os.path.join(autoDir, "*")))
-        ):
+        for nx, collected_xtals in enumerate(path_list):
             self.Logfile.insert("%s: %s" % (nx, collected_xtals))
             self.visit = collected_xtals.split("/")[5]
             if (
