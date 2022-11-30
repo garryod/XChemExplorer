@@ -3220,15 +3220,6 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
             ):
                 continue
             if not os.path.isdir(collected_xtals):
-                continue
-
-            if (
-                "tmp" in collected_xtals
-                or "results" in collected_xtals
-                or "scre" in collected_xtals
-            ):
-                continue
-            if not os.path.isdir(collected_xtals):
                 self.Logfile.warning(collected_xtals + " is not a directory")
                 continue
 
