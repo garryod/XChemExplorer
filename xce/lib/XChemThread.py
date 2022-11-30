@@ -1,3 +1,4 @@
+import cProfile
 import csv
 import glob
 import math
@@ -2772,7 +2773,11 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
         ]
 
     def run(self):
+        profiler = cProfile.Profile()
+        profiler.enable()
         self.parse_file_system()
+        profiler.disable()
+        profiler.dump_stats("read_write_autoprocessing_results_from_to_disc.cprof")
 
     def getExistingSamples(self):
         existingSamples = {}
