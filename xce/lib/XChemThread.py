@@ -3228,10 +3228,12 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
             self.Logfile.insert("%s: checking auto-processing results" % xtal)
             self.createSampleDir(xtal)
 
-            if self.target == "=== project directory ===":
-                runDir = os.path.join(collected_xtals, "processed", "*")
-            else:
-                runDir = os.path.join(collected_xtals, "*")
+            runDir = (
+                os.path.join(collected_xtals, "processed", "*")
+                if self.target == "=== project directory ==="
+                else os.path.join(collected_xtals, "*")
+            )
+
             self.Logfile.insert("current runDir: " + runDir)
 
             for run in sorted(glob.glob(runDir)):
