@@ -809,6 +809,17 @@ class run_pandda_export(QtCore.QThread):
     def export_models(self):
         self.Logfile.insert("finding out which PanDDA models need to be exported")
 
+        # find pandda_inspect_events.csv and read in as pandas dataframe
+        inspect_csv = None
+        if os.path.isfile(
+                os.path.join(self.PanDDA_directory, "analyses", "pandda_inspect_events.csv")
+        ):
+            inspect_csv = pandas.read_csv(
+                os.path.join(
+                    self.PanDDA_directory, "analyses", "pandda_inspect_events.csv"
+                )
+            )
+
         # first find which samples are in interesting datasets and have a model
         # and determine the timestamp
         fileModelsDict = {}
@@ -823,6 +834,22 @@ class run_pandda_export(QtCore.QThread):
             )
         ):
             sample = model[model.rfind("/") + 1 :].replace("-pandda-model.pdb", "")
+
+            # Check if there are non-low confidence models
+            sample_events = inspect_csv[inspect_csv['dtag'] == sample]
+            sample_high_conf_events = sample_events[sample_events['Ligand Confidence'] != "Low"]
+            if len(sample_events) == 0:
+                self.Logfile.insert("{}: Found {} non-low confidence events! Not Exporting!".format(
+                    sample,
+                    len(sample_high_conf_events))
+                )
+                continue
+            else:
+                self.Logfile.insert("{}: Found {} non-low confidence events! Exporting!".format(
+                    sample,
+                    len(sample_high_conf_events)
+                ))
+
             timestamp = datetime.fromtimestamp(os.path.getmtime(model)).strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
