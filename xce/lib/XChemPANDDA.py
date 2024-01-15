@@ -501,11 +501,12 @@ class run_pandda_export(QtCore.QThread):
         }
 
     def update_event_map_headers(self):
+        base = "/dls/science/groups/i04-1/software/update_event_map_headers"
         script = (
             "#!/bin/sh\n"
-            "/dls/science/groups/i04-1/software/update_event_map_headers/env/bin/python "
-            "/dls/science/groups/i04-1/software/update_event_map_headers/update_event_map_headers.py "
-            "{}".format(self.panddas_directory)
+            f"{base}/env/bin/python "
+            f"{base}/update_event_map_headers.py "
+            f"{self.panddas_directory}"
         )
         p = subprocess.Popen(
             script,
@@ -514,7 +515,6 @@ class run_pandda_export(QtCore.QThread):
             shell=True
         )
         stdout, stderr = p.communicate()
-
 
     def run(self):
         self.update_event_map_headers()
@@ -868,16 +868,18 @@ class run_pandda_export(QtCore.QThread):
             if len(sample_events) == 0:
                 self.Logfile.insert(
                     "{}: Found {} non-low confidence events! Not Exporting!".format(
-                    sample,
-                    len(sample_high_conf_events))
+                        sample,
+                        len(sample_high_conf_events)
+                    )
                 )
                 continue
             else:
                 self.Logfile.insert(
                     "{}: Found {} non-low confidence events! Exporting!".format(
-                    sample,
-                    len(sample_high_conf_events)
-                ))
+                        sample,
+                        len(sample_high_conf_events)
+                    )
+                )
 
             timestamp = datetime.fromtimestamp(os.path.getmtime(model)).strftime(
                 "%Y-%m-%d %H:%M:%S"
