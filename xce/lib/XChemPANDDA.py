@@ -506,7 +506,7 @@ class run_pandda_export(QtCore.QThread):
             "#!/bin/sh\n"
             "{}/env/bin/python "
             "{}/update_event_map_headers.py "
-            "{}".format(base,base,self.panddas_directory)
+            "{}".format(base, base, self.panddas_directory)
         )
         p = subprocess.Popen(
             script,
