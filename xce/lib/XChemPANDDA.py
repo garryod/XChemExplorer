@@ -1,6 +1,7 @@
 import csv
 import glob
 import os
+import subprocess
 from datetime import datetime
 
 from PyQt4 import QtCore
@@ -499,7 +500,25 @@ class run_pandda_export(QtCore.QThread):
             "TWIN": "",
         }
 
+    def update_event_map_headers(self):
+        script = (
+            "#!/bin/sh\n"
+            "/dls/science/groups/i04-1/software/update_event_map_headers/env/bin/python "
+            "/dls/science/groups/i04-1/software/update_event_map_headers/update_event_map_headers.py "
+            "{}".format(self.panddas_directory)
+        )
+        p = subprocess.Popen(
+            script,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True
+        )
+        stdout, stderr = p.communicate()
+
+
     def run(self):
+        self.update_event_map_headers()
+
         samples_to_export = self.export_models()
 
         self.import_samples_into_datasouce(samples_to_export)
@@ -812,11 +831,17 @@ class run_pandda_export(QtCore.QThread):
         # find pandda_inspect_events.csv and read in as pandas dataframe
         inspect_csv = None
         if os.path.isfile(
-                os.path.join(self.PanDDA_directory, "analyses", "pandda_inspect_events.csv")
+                os.path.join(
+                    self.panddas_directory,
+                    "analyses",
+                    "pandda_inspect_events.csv",
+                )
         ):
             inspect_csv = pandas.read_csv(
                 os.path.join(
-                    self.PanDDA_directory, "analyses", "pandda_inspect_events.csv"
+                    self.panddas_directory,
+                    "analyses",
+                    "pandda_inspect_events.csv"
                 )
             )
 
@@ -837,15 +862,19 @@ class run_pandda_export(QtCore.QThread):
 
             # Check if there are non-low confidence models
             sample_events = inspect_csv[inspect_csv['dtag'] == sample]
-            sample_high_conf_events = sample_events[sample_events['Ligand Confidence'] != "Low"]
+            sample_high_conf_events = sample_events[
+                sample_events['Ligand Confidence'] != "Low"
+            ]
             if len(sample_events) == 0:
-                self.Logfile.insert("{}: Found {} non-low confidence events! Not Exporting!".format(
+                self.Logfile.insert(
+                    "{}: Found {} non-low confidence events! Not Exporting!".format(
                     sample,
                     len(sample_high_conf_events))
                 )
                 continue
             else:
-                self.Logfile.insert("{}: Found {} non-low confidence events! Exporting!".format(
+                self.Logfile.insert(
+                    "{}: Found {} non-low confidence events! Exporting!".format(
                     sample,
                     len(sample_high_conf_events)
                 ))
