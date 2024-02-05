@@ -218,11 +218,11 @@ class export_and_refine_ligand_bound_models(QtCore.QThread):
             # Check if dataset has a corresponding plausible event and skip if not
             dtag_table = pandda_inspect_table[pandda_inspect_table["dtag"] == sample]
             non_low_confidence_table = dtag_table[
-                dtag_table["Ligand Confidence"] != "Low"
+                dtag_table["Ligand Placed"] == True
             ]
             if len(non_low_confidence_table) == 0:
                 self.Logfile.insert(
-                    sample + " has no high confidence events. Skipping!"
+                    sample + " has no fitted events. Skipping!"
                 )
                 continue
 
@@ -863,11 +863,11 @@ class run_pandda_export(QtCore.QThread):
             # Check if there are non-low confidence models
             sample_events = inspect_csv[inspect_csv['dtag'] == sample]
             sample_high_conf_events = sample_events[
-                sample_events['Ligand Confidence'] != "Low"
+                sample_events['Ligand Placed'] == True
             ]
             if len(sample_events) == 0:
                 self.Logfile.insert(
-                    "{}: Found {} non-low confidence events! Not Exporting!".format(
+                    "{}: Found {} non-fitted events! Not Exporting!".format(
                         sample,
                         len(sample_high_conf_events)
                     )
@@ -875,7 +875,7 @@ class run_pandda_export(QtCore.QThread):
                 continue
             else:
                 self.Logfile.insert(
-                    "{}: Found {} non-low confidence events! Exporting!".format(
+                    "{}: Found {} non-fitted events! Exporting!".format(
                         sample,
                         len(sample_high_conf_events)
                     )
