@@ -794,6 +794,7 @@ class run_pandda_export(QtCore.QThread):
                 db_dict["PANDDA_site_initial_mtz"] = inital_mtz
                 db_dict["PANDDA_site_spider_plot"] = ""
 
+
                 # find apo structures which were used
                 # XXX missing XXX
 
