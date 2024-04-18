@@ -1392,11 +1392,15 @@ class run_pandda_two_analyse(QtCore.QThread):
             + ' --pdb_regex="{0!s}" '.format(self.pdb_style)
             + ' --mtz_regex="{0!s}" '.format(self.mtz_style)
             + " --local_cpus=36"
-            + " {}".format(ignore_string)
-            + " {}".format(char_string)
-            + " {}".format(zmap_string)
             + " {0!s} ".format(self.keyword_arguments)
         )
+
+        if len(ignore) > 0:
+            cmd = cmd + " {}".format(ignore_string)
+        if len(char) > 0:
+            cmd = cmd + " {}".format(char_string)
+        if len(zmap) > 0:
+            cmd = cmd + " {}".format(zmap_string)
 
         self.Logfile.insert(
             "running pandda.analyse with the following command:\n" + cmd
