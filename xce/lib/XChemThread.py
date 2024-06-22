@@ -1,3 +1,4 @@
+import cProfile
 import csv
 import glob
 import math
@@ -2656,7 +2657,11 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
         ]
 
     def run(self):
+        profiler = cProfile.Profile()
+        profiler.enable()
         self.parse_file_system()
+        profiler.disable()
+        profiler.dump_stats("read_write_autoprocessing_results_from_to_disc.cprof")
 
     def getExistingSamples(self):
         existingSamples = {}
@@ -3083,27 +3088,15 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
             autoDir = self.processedDir
 
         self.Logfile.insert("checking for new data processing results in " + autoDir)
+        path_list = sorted(glob.glob(os.path.join(autoDir, "*")))
         progress = 0
-        progress_step = XChemMain.getProgressSteps(
-            len(glob.glob(os.path.join(autoDir, "*")))
-        )
+        progress_step = XChemMain.getProgressSteps(len(path_list))
 
         runList = []
         self.Logfile.insert("--> " + os.path.join(autoDir, "*"))
-        for nx, collected_xtals in enumerate(
-            sorted(glob.glob(os.path.join(autoDir, "*")))
-        ):
+        for nx, collected_xtals in enumerate(path_list):
             self.Logfile.insert("%s: %s" % (nx, collected_xtals))
             self.visit = collected_xtals.split("/")[5]
-            if (
-                "tmp" in collected_xtals
-                or "results" in collected_xtals
-                or "scre" in collected_xtals
-            ):
-                continue
-            if not os.path.isdir(collected_xtals):
-                continue
-
             if (
                 "tmp" in collected_xtals
                 or "results" in collected_xtals
@@ -3119,10 +3112,12 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
             self.Logfile.insert("%s: checking auto-processing results" % xtal)
             self.createSampleDir(xtal)
 
-            if self.target == "=== project directory ===":
-                runDir = os.path.join(collected_xtals, "processed", "*")
-            else:
-                runDir = os.path.join(collected_xtals, "*")
+            runDir = (
+                os.path.join(collected_xtals, "processed", "*")
+                if self.target == "=== project directory ==="
+                else os.path.join(collected_xtals, "*")
+            )
+
             self.Logfile.insert("current runDir: " + runDir)
 
             for run in sorted(glob.glob(runDir)):
