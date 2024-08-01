@@ -8,7 +8,7 @@ import pygtk
 
 from xce.lib import XChemLog
 from xce.lib import XChemUtils
-from xce.lib.cluster import sge, slurm
+from xce.lib.cluster import slurm
 
 pygtk.require("2.0")
 
@@ -510,9 +510,6 @@ class Refine(object):
             " refine_molprobity.log"
         )
 
-    def get_shebang(self):
-        return "#!" + os.getenv("SHELL") + "\n"
-
     def load_modules(self, cmd):
         #######################################################
         # PHENIX stuff (if working at DLS)
@@ -693,23 +690,23 @@ class Refine(object):
         f.write(cmd)
         f.close()
 
-    def run_script(self, program, external_software, Serial, xce_logfile):
+    def run_script(self, program, external_software, Serial, xce_logfile, slurm_token):
         os.chdir(os.path.join(self.ProjectPath, self.xtalID))
-        if external_software["slurm"]:
-            slurm.submit_cluster_job(
-                "xce_{!s}".format(program), "{!s}.sh".format(program), xce_logfile
-            )
-        elif external_software["qsub"]:
-            sge.submit_cluster_job(
-                "xce_{!s}".format(program), "{!s}.sh".format(program), xce_logfile
-            )
-        else:
-            self.Logfile.insert("starting refinement with command: ./%s.sh &" % program)
-            os.system("chmod +x %s.sh" % program)
-            os.system("./%s.sh &" % program)
+        slurm.submit_cluster_job(
+            "xce_{!s}".format(program),
+            "{!s}.sh".format(program),
+            xce_logfile,
+            slurm_token,
+        )
 
     def RunBuster(
-        self, Serial, RefmacParams, external_software, xce_logfile, covLinkAtomSpec
+        self,
+        Serial,
+        RefmacParams,
+        external_software,
+        xce_logfile,
+        covLinkAtomSpec,
+        slurm_token,
     ):
         if RefmacParams is None:
             anisotropic_Bfactor = " -M ADP "
@@ -770,7 +767,7 @@ class Refine(object):
 
         self.write_refinement_in_progress()
 
-        cmd = self.get_shebang()
+        cmd = "#!/bin/bash\n. /etc/profile.d/modules.sh\n"
 
         cmd = self.load_modules(cmd)
 
@@ -811,7 +808,9 @@ class Refine(object):
             )
             self.write_refinement_script(cmd, "buster")
             self.Logfile.insert("%s: starting refinement..." % self.xtalID)
-            self.run_script("buster", external_software, Serial, xce_logfile)
+            self.run_script(
+                "buster", external_software, Serial, xce_logfile, slurm_token
+            )
 
     def prepare_gelly_dat(self, ligand_info):
         found_ligand = False
@@ -842,7 +841,13 @@ class Refine(object):
         return found_ligand
 
     def RunRefmac(
-        self, Serial, RefmacParams, external_software, xce_logfile, covLinkAtomSpec
+        self,
+        Serial,
+        RefmacParams,
+        external_software,
+        xce_logfile,
+        covLinkAtomSpec,
+        slurm_token,
     ):
         if os.path.isfile(xce_logfile):
             Logfile = XChemLog.updateLog(xce_logfile)
@@ -868,7 +873,7 @@ class Refine(object):
             os.path.join(self.ProjectPath, self.xtalID, self.xtalID + ".free.mtz")
         ):
             RefmacParams["HKLIN"] = "HKLIN " + os.path.join(
-                self.ProjectPath, self.xtalID, self.xtalID + ".free.mtz \\\n"
+                self.ProjectPath, self.xtalID, self.xtalID + ".free.mtz"
             )
         else:
             Logfile.error(
@@ -879,19 +884,19 @@ class Refine(object):
             self.ProjectPath,
             self.xtalID,
             "Refine_" + Serial,
-            "refine_" + Serial + ".mtz \\\n",
+            "refine_" + Serial + ".mtz",
         )
 
         #######################################################
         # XYZIN & XYZOUT
         RefmacParams["XYZIN"] = "XYZIN " + os.path.join(
-            self.ProjectPath, self.xtalID, "Refine_" + Serial, "in.pdb \\\n"
+            self.ProjectPath, self.xtalID, "Refine_" + Serial, "in.pdb"
         )
         RefmacParams["XYZOUT"] = "XYZOUT " + os.path.join(
             self.ProjectPath,
             self.xtalID,
             "Refine_" + Serial,
-            "refine_" + Serial + ".pdb \\\n",
+            "refine_" + Serial + ".pdb",
         )
 
         #######################################################
@@ -1057,109 +1062,66 @@ class Refine(object):
                 )
 
         refmacCmds = (
-            "#!"
-            + os.getenv("SHELL")
-            + "\n"
-            + +'export XChemExplorer_DIR="'
-            + os.getenv("XChemExplorer_DIR")
-            + '"\n'
+            "#!/bin/bash\n"
+            + ". /etc/profile.d/modules.sh\n"
+            + 'export XChemExplorer_DIR="' + os.getenv("XChemExplorer_DIR") + '"\n'
             + "module load phenix/1.20\n"
             + "module load buster/20240123\n"
-            + "cd "
-            + self.ProjectPath
-            + "/"
-            + self.xtalID
-            + "/Refine_"
-            + Serial
+            + "module load ccp4\n"
+            + "cd " + self.ProjectPath + "/" + self.xtalID + "/Refine_" + Serial + "\n"
             + "\n"
-            "\n"
-            + refinementStatus
-            + "\n"
+            + refinementStatus + "\n"
             + findTLS
-            + "refmac5 "
-            + RefmacParams["HKLIN"]
-            + RefmacParams["HKLOUT"]
-            + RefmacParams["XYZIN"]
-            + RefmacParams["XYZOUT"]
-            + RefmacParams["LIBIN"]
-            + RefmacParams["LIBOUT"]
-            + RefmacParams["TLSIN"]
-            + RefmacParams["TLSOUT"]
-            + " << EOF > refmac.log\n"
-            "make -\n"
-            "    hydrogen ALL -\n"
-            "    hout NO -\n"
-            "    peptide NO -\n"
-            "    cispeptide YES -\n"
-            "    ssbridge YES -\n"
-            "    symmetry YES -\n"
-            "    sugar YES -\n"
-            "    connectivity NO -\n"
-            "    link NO\n" + RefmacParams["NCS"] + "refi -\n"
-            "    type REST -\n"
-            "    resi MLKF -\n"
-            "    meth CGMAT -\n"
+            + "refmac5 " 
+            + RefmacParams["HKLIN"] + " "
+            + RefmacParams["HKLOUT"] + " "
+            + RefmacParams["XYZIN"] + " "
+            + RefmacParams["XYZOUT"] + " "
+            + RefmacParams["LIBIN"] + " "
+            + RefmacParams["LIBOUT"] + " "
+            + RefmacParams["TLSIN"] + " "
+            + RefmacParams["TLSOUT"] + " << EOF > refmac.log\n"
+            + "make - hydrogen ALL - hout NO - peptide NO - cispeptide YES - ssbridge YES - symmetry YES - sugar YES - connectivity NO - link NO\n"
+            + RefmacParams["NCS"]
+            + "refi - type REST - resi MLKF - meth CGMAT\n"
             + RefmacParams["BREF"]
             + RefmacParams["TLS"]
             + RefmacParams["TWIN"]
-            + "ncyc "
-            + RefmacParams["NCYCLES"]
+            + "ncyc " + RefmacParams["NCYCLES"] + "\n"
+            + "scal - type SIMP - LSSC - ANISO - EXPE\n"
+            + weight + "solvent YES\n"
+            + "monitor MEDIUM - torsion 10.0 - distance 10.0 - angle 10.0 - plane 10.0 - chiral 10.0 - bfactor 10.0 - bsphere 10.0 - rbond 10.0 - ncsr 10.0\n"
+            + "labin FP=F SIGFP=SIGF FREE=FreeR_flag\n"
+            + "labout FC=FC FWT=FWT PHIC=PHIC PHWT=PHWT DELFWT=DELFWT PHDELWT=PHDELWT FOM=FOM\n"
+            + RefmacParams["TLSADD"] + "\n"
+            + "DNAME " + self.xtalID + "\n"
+            + "END\n"
+            + "EOF\n"
             + "\n"
-            "scal -\n"
-            "    type SIMP -\n"
-            "    LSSC -\n"
-            "    ANISO -\n"
-            "    EXPE\n" + weight + "solvent YES\n"
-            "monitor MEDIUM -\n"
-            "    torsion 10.0 -\n"
-            "    distance 10.0 -\n"
-            "    angle 10.0 -\n"
-            "    plane 10.0 -\n"
-            "    chiral 10.0 -\n"
-            "    bfactor 10.0 -\n"
-            "    bsphere 10.0 -\n"
-            "    rbond 10.0 -\n"
-            "    ncsr 10.0\n"
-            "labin  FP=F SIGFP=SIGF FREE=FreeR_flag\n"
-            "labout  FC=FC FWT=FWT PHIC=PHIC PHWT=PHWT DELFWT=DELFWT PHDELWT=PHDELWT"
-            " FOM=FOM\n" + RefmacParams["TLSADD"] + "\n"
-            "DNAME " + self.xtalID + "\n"
-            "END\n"
-            "EOF\n"
-            "\n"
-            "phenix.molprobity refine_%s.pdb refine_%s.mtz\n" % (Serial, Serial)
+            + "phenix.molprobity refine_%s.pdb refine_%s.mtz\n" % (Serial, Serial)
             + "/bin/mv molprobity.out refine_molprobity.log\n"
-            "mmtbx.validate_ligands refine_%s.pdb refine_%s.mtz LIG"
-            " > validate_ligands.txt\n" % (Serial, Serial)
-            + "cd "
-            + self.ProjectPath
-            + "/"
-            + self.xtalID
-            + "\n"
-            "#ln -s %s/%s/Refine_%s/refine_%s.pdb refine.pdb\n"
-            % (self.ProjectPath, self.xtalID, Serial, Serial)
-            + "#ln -s %s/%s/Refine_%s/refine_%s.mtz refine.mtz\n"
-            % (self.ProjectPath, self.xtalID, Serial, Serial)
+            + "mmtbx.validate_ligands refine_%s.pdb refine_%s.mtz LIG > validate_ligands.txt\n" % (Serial, Serial)
+            + "cd " + self.ProjectPath + "/" + self.xtalID + "\n"
             + "ln -s ./Refine_%s/refine_%s.pdb refine.pdb\n" % (Serial, Serial)
             + "ln -s ./Refine_%s/refine_%s.mtz refine.mtz\n" % (Serial, Serial)
             + "ln -s refine.pdb refine.split.bound-state.pdb\n"
-            "\n"
-            "ln -s Refine_%s/validate_ligands.txt .\n" % Serial
+            + "\n"
+            + "ln -s Refine_%s/validate_ligands.txt .\n" % Serial
             + "ln -s Refine_%s/refine_molprobity.log .\n" % Serial
             + "mmtbx.validation_summary refine.pdb > validation_summary.txt\n"
-            "\n"
-            "fft hklin refine.mtz mapout 2fofc.map << EOF\n"
-            "labin F1=FWT PHI=PHWT\n"
-            "EOF\n"
-            "\n"
-            "fft hklin refine.mtz mapout fofc.map << EOF\n"
-            "labin F1=DELFWT PHI=PHDELWT\n"
-            "EOF\n"
-            "\n" + updateDB + "\n"
-            "/bin/rm %s/%s/REFINEMENT_IN_PROGRESS\n" % (self.ProjectPath, self.xtalID)
             + "\n"
-            "cd " + self.ProjectPath + "/" + self.xtalID + "/Refine_" + Serial + "\n"
-            "\n" + spider_plot + "\n"
+            + "fft hklin refine.mtz mapout 2fofc.map << EOF\n"
+            + "labin F1=FWT PHI=PHWT\n"
+            + "EOF\n"
+            + "\n"
+            + "fft hklin refine.mtz mapout fofc.map << EOF\n"
+            + "labin F1=DELFWT PHI=PHDELWT\n"
+            + "EOF\n"
+            + "\n" + updateDB + "\n"
+            + "/bin/rm %s/%s/REFINEMENT_IN_PROGRESS\n" % (self.ProjectPath, self.xtalID)
+            + "\n"
+            + "cd " + self.ProjectPath + "/" + self.xtalID + "/Refine_" + Serial + "\n"
+            + "\n" + spider_plot + "\n"
         )
 
         if os.path.isfile(xce_logfile):
@@ -1184,15 +1146,8 @@ class Refine(object):
             % (os.path.join(self.ProjectPath, self.xtalID, "Refine_" + Serial))
         )
 
-        if external_software["slurm"]:
-            slurm.submit_cluster_job("xce_refmac", "refmac.csh", xce_logfile)
-        elif external_software["qsub"]:
-            sge.submit_cluster_job("xce_refmac", "refmac.csh", xce_logfile)
-        else:
-            os.system("chmod +x refmac.csh")
-            if os.path.isfile(xce_logfile):
-                Logfile.insert("starting refinement on local machine")
-            os.system("./refmac.csh &")
+        slurm.submit_cluster_job("xce_refmac", "refmac.csh", xce_logfile, slurm_token)
+
 
     def RefinementParams(self, RefmacParams):
         self.RefmacParams = RefmacParams
@@ -1509,6 +1464,7 @@ class panddaRefine(object):
         xce_logfile,
         refinementProtocol,
         covLinkAtomSpec,
+        slurm_token,
     ):
         Logfile = XChemLog.updateLog(xce_logfile)
         Logfile.insert("preparing files for giant.quick_refine")
@@ -2003,9 +1959,8 @@ class panddaRefine(object):
         user = getpass.getuser()
 
         refmacCmds = (
-            "#!"
-            + os.getenv("SHELL")
-            + "\n"
+            "#!/bin/bash\n"
+            + ". /etc/profile.d/modules.sh\n"
             + module_load
             + "\n"
             + source
@@ -2157,15 +2112,7 @@ class panddaRefine(object):
             )
         )
 
-        if external_software["slurm"]:
-            slurm.submit_cluster_job("refmac", "refmac.csh", xce_logfile)
-        elif external_software["qsub"]:
-            sge.submit_cluster_job("refmac", "refmac.csh", xce_logfile)
-        else:
-            Logfile.insert("changing permission of refmac.csh: chmod +x refmac.csh")
-            os.system("chmod +x refmac.csh")
-            Logfile.insert("starting refinement on local machine")
-            os.system("./refmac.csh &")
+        slurm.submit_cluster_job("refmac", "refmac.csh", xce_logfile, slurm_token)
 
     def RefinementParams(self, RefmacParams):
         self.RefmacParams = RefmacParams
